@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -10,8 +11,10 @@
       box-sizing: border-box;
     }
 
-    body {
+    html, body {
       margin: 0;
+      width: 100%;
+      height: 100%;
       overflow: hidden;
       font-family: sans-serif;
       background: #202631;
@@ -19,33 +22,55 @@
     }
 
     #game-container {
-      width: 100vw;
-      height: 100vh;
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    #game-container canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
     }
 
     #ui {
-      position: absolute;
+      position: fixed;
       top: 15px;
       left: 0;
       width: 100%;
       text-align: center;
+      z-index: 10;
       pointer-events: none;
     }
 
     #status {
-      font-size: 24px;
+      font-size: clamp(18px, 4vw, 24px);
       font-weight: bold;
       text-shadow: 0 2px 5px black;
     }
 
     #restart {
-      margin-top: 10px;
+      margin-top: 12px;
       padding: 10px 24px;
       border: none;
       border-radius: 8px;
       font-size: 16px;
       cursor: pointer;
       pointer-events: auto;
+    }
+
+    #error {
+      position: fixed;
+      bottom: 10px;
+      left: 10px;
+      right: 10px;
+      padding: 10px;
+      color: #ffcccc;
+      background: #550000;
+      white-space: pre-wrap;
+      display: none;
+      z-index: 20;
     }
   </style>
 </head>
@@ -58,6 +83,9 @@
     <button id="restart">リスタート</button>
   </div>
 
+  <div id="error"></div>
+
+  <!-- Three.js本体をCDNから読み込む -->
   <script type="module" src="./main.js"></script>
 </body>
 </html>
