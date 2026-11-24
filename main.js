@@ -1,22 +1,33 @@
-import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
 
-// ============================
-// 基本設定
-// ============================
+import * as THREE from
+  'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
+
+// ===================================
+// HTML要素
+// ===================================
 
 const container = document.getElementById('game-container');
 const statusText = document.getElementById('status');
 const restartButton = document.getElementById('restart');
+const errorBox = document.getElementById('error');
+
+// エラーを画面に表示
+function showError(message) {
+  errorBox.style.display = 'block';
+  errorBox.textContent = message;
+}
+
+// ===================================
+// ゲーム設定
+// ===================================
 
 const BOX_WIDTH = 8;
 const BOX_DEPTH = 6;
 const BOX_HEIGHT = 2;
 
 const BALL_RADIUS = 0.38;
-const BALL_COUNT = 12;
 const PAIR_COUNT = 6;
 
-// 6色（各色2個）
 const COLORS = [
   0xff4444, // 赤
   0x44aaff, // 青
@@ -26,9 +37,9 @@ const COLORS = [
   0xff8833  // オレンジ
 ];
 
-// ============================
-// Three.js 基本構築
-// ============================
+// ===================================
+// Three.js初期設定
+// ===================================
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x202631);
@@ -41,7 +52,7 @@ const camera = new THREE.PerspectiveCamera(
 );
 
 camera.position.set(0, 8.5, 10);
-camera.lookAt(0, 0.8, 0);
+camera.lookAt(0, 0.7, 0);
 
 const renderer = new THREE.WebGLRenderer({
   antialias: true
@@ -50,29 +61,28 @@ const renderer = new THREE.WebGLRenderer({
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
-renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
 
 container.appendChild(renderer.domElement);
 
-// ============================
+// ===================================
 // ライト
-// ============================
+// ===================================
 
-const ambientLight = new THREE.AmbientLight(0xffffff, 2);
-scene.add(ambientLight);
+scene.add(
+  new THREE.AmbientLight(0xffffff, 2)
+);
 
-const directionalLight = new THREE.DirectionalLight(0xffffff, 3);
-directionalLight.position.set(4, 10, 5);
-directionalLight.castShadow = true;
-scene.add(directionalLight;
+const light = new THREE.DirectionalLight(0xffffff, 3);
+light.position.set(4, 10, 5);
+scene.add(light);
 
-// ============================
+// ===================================
 // 箱の作成
-// ============================
+// ===================================
 
 function createBox() {
-  // 底
+  // 底板
   const floor = new THREE.Mesh(
     new THREE.BoxGeometry(BOX_WIDTH, 0.3, BOX_DEPTH),
     new THREE.MeshStandardMaterial({
@@ -81,134 +91,77 @@ function createBox() {
   );
 
   floor.position.y = -0.15;
-  floor.receiveShadow = true;
   scene.add(floor);
 
-  // 壁の共通材質
+  // 壁
   const wallMaterial = new THREE.MeshStandardMaterial({
     color: 0xb0b8c8,
     transparent: true,
-    opacity: 0.65
+    opacity: 0.25
   });
 
-  // 左右の壁
-  const sideWallGeometry = new THREE.BoxGeometry(
-    0.25,
-    BOX_HEIGHT,
-    BOX_DEPTH
-  );
+  // 左右
+  for (const x of [-BOX_WIDTH / 2, BOX_WIDTH / 2]) {
+    const wall = new THREE.Mesh(
+      new THREE.BoxGeometry(0.25, BOX_HEIGHT, BOX_DEPTH),
+      wallMaterial
+    );
 
-  const leftWall = new THREE.Mesh(
-    sideWallGeometry,
-    wallMaterial
-  );
+    wall.position.set(x, BOX_HEIGHT / 2, 0);
+    scene.add(wall);
+  }
 
-  leftWall.position.set(
-    -BOX_WIDTH / 2,
-    BOX_HEIGHT / 2,
-    0
-  );
+  // 前後
+  for (const z of [-BOX_DEPTH / 2, BOX_DEPTH / 2]) {
+    const wall = new THREE.Mesh(
+      new THREE.BoxGeometry(BOX_WIDTH, BOX_HEIGHT, 0.25),
+      wallMaterial
+    );
 
-  scene.add(leftWall);
-
-  const rightWall = new THREE.Mesh(
-    sideWallGeometry,
-    wallMaterial
-  );
-
-  rightWall.position.set(
-    BOX_WIDTH / 2,
-    BOX_HEIGHT / 2,
-    0
-  );
-
-  scene.add(rightWall);
-
-  // 前後の壁
-  const endWallGeometry = new THREE.BoxGeometry(
-    BOX_WIDTH,
-    BOX_HEIGHT,
-    0.25
-  );
-
-  const backWall = new THREE.Mesh(
-    endWallGeometry,
-    wallMaterial
-  );
-
-  backWall.position.set(
-    0,
-    BOX_HEIGHT / 2,
-    -BOX_DEPTH / 2
-  );
-
-  scene.add(backWall);
-
-  const frontWall = new THREE.Mesh(
-    endWallGeometry,
-    wallMaterial
-  );
-
-  frontWall.position.set(
-    0,
-    BOX_HEIGHT / 2,
-    BOX_DEPTH / 2
-  );
-
-  scene.add(frontWall);
+    wall.position.set(0, BOX_HEIGHT / 2, z);
+    scene.add(wall);
+  }
 }
 
-// ============================
-// 球体の管理
-// ============================
+// ===================================
+// 球の管理
+// ===================================
 
 let balls = [];
 let firstSelected = null;
 let matchedPairs = 0;
 
-// ============================
-// 球体を作成
-// ============================
+// ===================================
+// 球の生成
+// ===================================
 
 function createBall(pairId, color) {
-  const geometry = new THREE.SphereGeometry(
-    BALL_RADIUS,
-    32,
-    32
+  const ball = new THREE.Mesh(
+    new THREE.SphereGeometry(BALL_RADIUS, 32, 32),
+    new THREE.MeshStandardMaterial({
+      color,
+      roughness: 0.35
+    })
   );
 
-  const material = new THREE.MeshStandardMaterial({
-    color: color,
-    roughness: 0.35,
-    metalness: 0.05
-  });
-
-  const ball = new THREE.Mesh(geometry, material);
-
-  ball.castShadow = true;
-  ball.receiveShadow = true;
-
-  // ペア判定用の情報
   ball.userData.pairId = pairId;
-  ball.userData.originalScale = 1;
   ball.userData.isMatched = false;
 
   return ball;
 }
 
-// ============================
-// ランダム配置
-// ============================
+// ===================================
+// 配置
+// ===================================
 
 function randomPosition() {
-  const margin = BALL_RADIUS + 0.1;
+  const margin = BALL_RADIUS + 0.15;
 
   return {
     x: THREE.MathUtils.randFloat(
       -BOX_WIDTH / 2 + margin,
       BOX_WIDTH / 2 - margin
     ),
-
     z: THREE.MathUtils.randFloat(
       -BOX_DEPTH / 2 + margin,
       BOX_DEPTH / 2 - margin
@@ -219,18 +172,12 @@ function randomPosition() {
 function isPositionAvailable(position, placedBalls) {
   const minDistance = BALL_RADIUS * 2 + 0.12;
 
-  for (const ball of placedBalls) {
+  return placedBalls.every(ball => {
     const dx = position.x - ball.position.x;
     const dz = position.z - ball.position.z;
 
-    const distance = Math.sqrt(dx * dx + dz * dz);
-
-    if (distance < minDistance) {
-      return false;
-    }
-  }
-
-  return true;
+    return Math.sqrt(dx * dx + dz * dz) >= minDistance;
+  });
 }
 
 function placeBall(ball, placedBalls) {
@@ -251,7 +198,6 @@ function placeBall(ball, placedBalls) {
     position.z
   );
 
-  // 球の向きをランダムにする
   ball.rotation.set(
     Math.random() * Math.PI,
     Math.random() * Math.PI,
@@ -262,12 +208,23 @@ function placeBall(ball, placedBalls) {
   placedBalls.push(ball);
 }
 
-// ============================
-// ゲーム初期化
-// ============================
+// ===================================
+// シャッフル
+// ===================================
+
+function shuffle(array) {
+  for (let i = array.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [array[i], array[j]] = [array[j], array[i]];
+  }
+}
+
+// ===================================
+// ゲーム開始・リセット
+// ===================================
 
 function startGame() {
-  // 前回の球を削除
+  // 前の球を片付ける
   for (const ball of balls) {
     scene.remove(ball);
     ball.geometry.dispose();
@@ -281,7 +238,7 @@ function startGame() {
   statusText.textContent =
     '同じ色の球を2つ選んでください';
 
-  // 各色2個ずつ作成
+  // 6色×2個
   const newBalls = [];
 
   COLORS.forEach((color, pairId) => {
@@ -289,69 +246,45 @@ function startGame() {
     newBalls.push(createBall(pairId, color));
   });
 
-  // 配置順をシャッフル
   shuffle(newBalls);
 
-  // 箱の中に配置
   for (const ball of newBalls) {
     placeBall(ball, balls);
   }
 }
 
-// ============================
-// シャッフル
-// ============================
-
-function shuffle(array) {
-  for (let i = array.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-
-    [array[i], array[j]] = [array[j], array[i]];
-  }
-}
-
-// ============================
-// 球の選択
-// ============================
+// ===================================
+// 選択処理
+// ===================================
 
 function selectBall(ball) {
-  // すでに消えた球は選択不可
   if (ball.userData.isMatched) return;
 
-  // 1個目の選択
+  // 1個目
   if (firstSelected === null) {
     firstSelected = ball;
-
-    // 選択した球を少し大きくする
-    ball.scale.setScalar(1.2);
+    ball.scale.setScalar(1.25);
 
     statusText.textContent = 'もう1つ選んでください';
     return;
   }
 
-  // 同じ球を2回タップした場合は何もしない
-  if (firstSelected === ball) {
-    return;
-  }
+  // 同じ球を連続選択しない
+  if (firstSelected === ball) return;
 
-  // 2個目の選択
+  // 2個目
   const secondSelected = ball;
+  secondSelected.scale.setScalar(1.25);
 
-  secondSelected.scale.setScalar(1.2);
-
-  // ペア判定
   checkPair(firstSelected, secondSelected);
 }
 
-// ============================
-// ペア判定
-// ============================
+// ===================================
+// 正誤判定
+// ===================================
 
 function checkPair(first, second) {
-  if (
-    first.userData.pairId ===
-    second.userData.pairId
-  ) {
+  if (first.userData.pairId === second.userData.pairId) {
     // 正解
     statusText.textContent = '正解！';
 
@@ -359,10 +292,8 @@ function checkPair(first, second) {
     removeBall(second);
 
     matchedPairs++;
-
     firstSelected = null;
 
-    // 全ペアを見つけたか
     if (matchedPairs === PAIR_COUNT) {
       statusText.textContent = 'クリア！全ペア発見！';
     }
@@ -374,32 +305,34 @@ function checkPair(first, second) {
 
     firstSelected = null;
 
-    statusText.textContent = '違うペアです。もう一度！';
+    statusText.textContent = '違います。もう一度！';
   }
 }
 
-// ============================
-// 球を消す
-// ============================
+// ===================================
+// 正解した球を削除
+// ===================================
 
 function removeBall(ball) {
   ball.userData.isMatched = true;
 
   scene.remove(ball);
 
+  // 選択対象リストからも除外
+  balls = balls.filter(b => b !== ball);
+
   ball.geometry.dispose();
   ball.material.dispose();
 }
 
-// ============================
-// タップ判定
-// ============================
+// ===================================
+// タップ・クリック判定
+// ===================================
 
 const raycaster = new THREE.Raycaster();
 const pointer = new THREE.Vector2();
 
-renderer.domElement.addEventListener('pointerdown', (event) => {
-  // タップ位置を正規化
+renderer.domElement.addEventListener('pointerdown', event => {
   const rect = renderer.domElement.getBoundingClientRect();
 
   pointer.x =
@@ -410,32 +343,25 @@ renderer.domElement.addEventListener('pointerdown', (event) => {
 
   raycaster.setFromCamera(pointer, camera);
 
-  // 球体だけを判定
   const intersects = raycaster.intersectObjects(balls);
 
   if (intersects.length > 0) {
-    const ball = intersects[0].object;
-
-    selectBall(ball);
+    selectBall(intersects[0].object);
   }
 });
 
-// ============================
-// リスタートボタン
-// ============================
+// ===================================
+// リスタート
+// ===================================
 
-restartButton.addEventListener('click', () => {
-  startGame();
-});
+restartButton.addEventListener('click', startGame);
 
-// ============================
+// ===================================
 // 画面サイズ変更
-// ============================
+// ===================================
 
 window.addEventListener('resize', () => {
-  camera.aspect =
-    window.innerWidth / window.innerHeight;
-
+  camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
 
   renderer.setSize(
@@ -448,20 +374,24 @@ window.addEventListener('resize', () => {
   );
 });
 
-// ============================
-// 描画ループ
-// ============================
+// ===================================
+// 描画
+// ===================================
 
 function animate() {
   requestAnimationFrame(animate);
-
   renderer.render(scene, camera);
 }
 
-// ============================
+// ===================================
 // 起動
-// ============================
+// ===================================
 
-createBox();
-startGame();
-animate();
+try {
+  createBox();
+  startGame();
+  animate();
+} catch (error) {
+  console.error(error);
+  showError('ゲームの起動に失敗しました。\n' + error.message);
+}
