@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ball Matching Game</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      overflow: hidden;
+      font-family: sans-serif;
+      background: #202631;
+      color: white;
+    }
+
+    #game-container {
+      width: 100vw;
+      height: 100vh;
+    }
+
+    #ui {
+      position: absolute;
+      top: 15px;
+      left: 0;
+      width: 100%;
+      text-align: center;
+      pointer-events: none;
+    }
+
+    #status {
+      font-size: 24px;
+      font-weight: bold;
+      text-shadow: 0 2px 5px black;
+    }
+
+    #restart {
+      margin-top: 10px;
+      padding: 10px 24px;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      cursor: pointer;
+      pointer-events: auto;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="game-container"></div>
+
+  <div id="ui">
+    <div id="status">同じ色の球を2つ選んでください</div>
+    <button id="restart">リスタート</button>
+  </div>
+
+  <script type="module" src="./main.js"></script>
+</body>
+</html>
